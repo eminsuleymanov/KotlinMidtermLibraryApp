@@ -1,9 +1,14 @@
 package com.example.kotlinlibraryapp.data
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
 const val DAY_MILLIS = 24L * 60 * 60 * 1000
 
+/** Room entity: one row per book. `id = 0` means "not inserted yet" (Room generates the id). */
+@Entity(tableName = "books")
 data class Book(
-    val id: Int,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,
     val author: String = "Unknown author",
     val genre: String = "General",
@@ -12,7 +17,9 @@ data class Book(
     val dueDateMillis: Long? = null,
     val rating: Int = 0,
     val isFavorite: Boolean = false,
-    val notes: String = ""
+    val notes: String = "",
+    /** How many times the current loan has been renewed. Reset on return. */
+    val renewCount: Int = 0
 ) {
     fun isOverdue(now: Long): Boolean =
         !isAvailable && (dueDateMillis?.let { it < now } == true)

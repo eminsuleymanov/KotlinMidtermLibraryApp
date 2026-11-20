@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -39,8 +40,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.kotlinlibraryapp.ui.LibraryEvent
 import com.example.kotlinlibraryapp.ui.LibraryViewModel
-import com.example.kotlinlibraryapp.ui.screens.AddBookScreen
 import com.example.kotlinlibraryapp.ui.screens.BookDetailsScreen
+import com.example.kotlinlibraryapp.ui.screens.BookFormScreen
+import com.example.kotlinlibraryapp.ui.screens.HistoryScreen
 import com.example.kotlinlibraryapp.ui.screens.LibraryScreen
 import com.example.kotlinlibraryapp.ui.screens.LoansScreen
 import com.example.kotlinlibraryapp.ui.screens.StatsScreen
@@ -48,8 +50,13 @@ import com.example.kotlinlibraryapp.ui.screens.StatsScreen
 sealed class Screen(val route: String) {
     object Library : Screen("library")
     object Loans : Screen("loans")
+    object History : Screen("history")
     object Stats : Screen("stats")
     object AddBook : Screen("add_book")
+    object EditBook : Screen("edit_book/{bookId}") {
+        const val ARG_BOOK_ID = "bookId"
+        fun createRoute(bookId: Int) = "edit_book/$bookId"
+    }
     object Details : Screen("details/{bookId}") {
         const val ARG_BOOK_ID = "bookId"
         fun createRoute(bookId: Int) = "details/$bookId"
@@ -65,11 +72,12 @@ private data class BottomDestination(
 private val bottomDestinations = listOf(
     BottomDestination(Screen.Library, "Shelf", Icons.Default.Home),
     BottomDestination(Screen.Loans, "Loans", Icons.Default.DateRange),
+    BottomDestination(Screen.History, "History", Icons.Default.Refresh),
     BottomDestination(Screen.Stats, "Stats", Icons.Default.Info)
 )
 
 @Composable
-fun LibraryApp(viewModel: LibraryViewModel = viewModel()) {
+fun LibraryApp(viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -170,6 +178,20 @@ fun LibraryApp(viewModel: LibraryViewModel = viewModel()) {
                 )
             }
 
+            composable(Screen.History.route) {
+                val bookIds = remember(uiState.books) { uiState.books.map { it.id }.toSet() }
+                HistoryScreen(
+                    events = uiState.visibleHistory,
+                    totalEventCount = uiState.history.size,
+                    stats = uiState.historyStats,
+                    filter = uiState.historyFilter,
+                    existingBookIds = bookIds,
+                    onFilterChange = viewModel::onHistoryFilterChange,
+                    onBookClick = { navController.navigate(Screen.Details.createRoute(it)) },
+                    onClearHistory = viewModel::clearHistory
+                )
+            }
+
             composable(Screen.Stats.route) {
                 StatsScreen(stats = uiState.stats)
             }
@@ -183,8 +205,10 @@ fun LibraryApp(viewModel: LibraryViewModel = viewModel()) {
                 val bookId = entry.arguments?.getInt(Screen.Details.ARG_BOOK_ID) ?: -1
                 BookDetailsScreen(
                     book = uiState.books.firstOrNull { it.id == bookId },
+                    history = uiState.history.filter { it.bookId == bookId },
                     now = uiState.now,
                     onBack = { navController.popBackStack() },
+                    onEdit = { navController.navigate(Screen.EditBook.createRoute(bookId)) },
                     onToggleBorrow = { viewModel.toggleBorrow(bookId) },
                     onRenew = { viewModel.renew(bookId) },
                     onToggleFavorite = { viewModel.toggleFavorite(bookId) },
@@ -198,10 +222,33 @@ fun LibraryApp(viewModel: LibraryViewModel = viewModel()) {
             }
 
             composable(Screen.AddBook.route) {
-                AddBookScreen(
+                BookFormScreen(
+                    isEdit = false,
+                    initialBook = null,
+                    isLoading = false,
                     onBack = { navController.popBackStack() },
                     onSave = { title, author, genre, coverUrl ->
-                        if (viewModel.addBook(title, author, genre, coverUrl)) {
+                        viewModel.saveBook(null, title, author, genre, coverUrl) {
+                            navController.popBackStack()
+                        }
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.EditBook.route,
+                arguments = listOf(
+                    navArgument(Screen.EditBook.ARG_BOOK_ID) { type = NavType.IntType }
+                )
+            ) { entry ->
+                val bookId = entry.arguments?.getInt(Screen.EditBook.ARG_BOOK_ID) ?: -1
+                BookFormScreen(
+                    isEdit = true,
+                    initialBook = uiState.books.firstOrNull { it.id == bookId },
+                    isLoading = uiState.isLoading,
+                    onBack = { navController.popBackStack() },
+                    onSave = { title, author, genre, coverUrl ->
+                        viewModel.saveBook(bookId, title, author, genre, coverUrl) {
                             navController.popBackStack()
                         }
                     }

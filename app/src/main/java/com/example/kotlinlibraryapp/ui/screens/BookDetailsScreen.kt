@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.AlertDialog
@@ -25,16 +26,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.kotlinlibraryapp.data.Book
+import com.example.kotlinlibraryapp.data.LoanEvent
+import com.example.kotlinlibraryapp.domain.LoanPolicy
 import com.example.kotlinlibraryapp.ui.components.BookCover
 import com.example.kotlinlibraryapp.ui.components.EmptyState
+import com.example.kotlinlibraryapp.ui.components.EventRow
 import com.example.kotlinlibraryapp.ui.components.RatingBar
 import com.example.kotlinlibraryapp.ui.components.ScreenTopBar
+import com.example.kotlinlibraryapp.ui.components.SectionHeader
 import com.example.kotlinlibraryapp.ui.components.StatusChip
 import com.example.kotlinlibraryapp.ui.components.dueLabel
 import com.example.kotlinlibraryapp.ui.components.formatDate
@@ -42,8 +48,10 @@ import com.example.kotlinlibraryapp.ui.components.formatDate
 @Composable
 fun BookDetailsScreen(
     book: Book?,
+    history: List<LoanEvent>,
     now: Long,
     onBack: () -> Unit,
+    onEdit: () -> Unit,
     onToggleBorrow: () -> Unit,
     onRenew: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -70,6 +78,9 @@ fun BookDetailsScreen(
                                 tint = MaterialTheme.colorScheme.secondary
                             )
                         }
+                        IconButton(onClick = onEdit) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit book")
+                        }
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete book")
                         }
@@ -83,6 +94,7 @@ fun BookDetailsScreen(
         } else {
             BookDetailsContent(
                 book = book,
+                history = history,
                 now = now,
                 onToggleBorrow = onToggleBorrow,
                 onRenew = onRenew,
@@ -114,6 +126,7 @@ fun BookDetailsScreen(
 @Composable
 private fun BookDetailsContent(
     book: Book,
+    history: List<LoanEvent>,
     now: Long,
     onToggleBorrow: () -> Unit,
     onRenew: () -> Unit,
@@ -166,7 +179,10 @@ private fun BookDetailsContent(
                 Text(if (book.isAvailable) "Borrow" else "Return")
             }
             if (!book.isAvailable) {
-                OutlinedButton(onClick = onRenew) { Text("Renew +7 days") }
+                val renewalsLeft = LoanPolicy.MAX_RENEWALS - book.renewCount
+                OutlinedButton(onClick = onRenew, enabled = renewalsLeft > 0) {
+                    Text("Renew +${LoanPolicy.RENEW_DAYS} days ($renewalsLeft left)")
+                }
             }
         }
 
@@ -194,5 +210,18 @@ private fun BookDetailsContent(
                 enabled = notes.trim() != book.notes
             ) { Text("Save notes") }
         }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionHeader(title = "Activity", subtitle = "${history.size} recorded")
+            if (history.isEmpty()) {
+                EmptyState("No activity recorded for this book yet.")
+            } else {
+                history.take(MAX_HISTORY_SHOWN).forEach { event ->
+                    key(event.id) { EventRow(event, showBookTitle = false) }
+                }
+            }
+        }
     }
 }
+
+private const val MAX_HISTORY_SHOWN = 10

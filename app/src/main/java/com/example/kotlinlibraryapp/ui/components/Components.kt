@@ -37,6 +37,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.example.kotlinlibraryapp.data.Book
+import com.example.kotlinlibraryapp.data.EventType
+import com.example.kotlinlibraryapp.data.LoanEvent
 import java.text.DateFormat
 import java.util.Date
 
@@ -44,6 +46,9 @@ import java.util.Date
 
 fun formatDate(millis: Long): String =
     DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(millis))
+
+fun formatDateTime(millis: Long): String =
+    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))
 
 private fun plural(count: Int, unit: String) = "$count $unit${if (count == 1) "" else "s"}"
 
@@ -284,5 +289,70 @@ fun EmptyState(message: String, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+/** One line of the activity history. Pass [onClick] only when the book still exists. */
+@Composable
+fun EventRow(
+    event: LoanEvent,
+    modifier: Modifier = Modifier,
+    showBookTitle: Boolean = true,
+    onClick: (() -> Unit)? = null
+) {
+    val colors = MaterialTheme.colorScheme
+    val (container, content) = when {
+        event.type == EventType.RETURNED && !event.onTime -> colors.errorContainer to colors.onErrorContainer
+        event.type == EventType.RETURNED -> colors.primaryContainer to colors.onPrimaryContainer
+        event.type == EventType.BORROWED -> colors.secondaryContainer to colors.onSecondaryContainer
+        event.type == EventType.RENEWED -> colors.tertiaryContainer to colors.onTertiaryContainer
+        event.type == EventType.DELETED -> colors.errorContainer to colors.onErrorContainer
+        else -> colors.surfaceVariant to colors.onSurfaceVariant
+    }
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(shape = RoundedCornerShape(50), color = container) {
+                Text(
+                    text = event.type.label,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = content
+                )
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                if (showBookTitle) {
+                    Text(
+                        text = event.bookTitle,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                event.detail?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.onSurfaceVariant
+                    )
+                }
+                Text(
+                    text = formatDateTime(event.timestamp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurfaceVariant
+                )
+            }
+        }
     }
 }

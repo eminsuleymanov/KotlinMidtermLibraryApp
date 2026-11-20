@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.kotlinlibraryapp.data.Book
+import com.example.kotlinlibraryapp.domain.LoanPolicy
 import com.example.kotlinlibraryapp.ui.components.BookCover
 import com.example.kotlinlibraryapp.ui.components.EmptyState
 import com.example.kotlinlibraryapp.ui.components.ScreenTopBar
@@ -56,8 +57,15 @@ fun LoansScreen(
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                item(key = "slots") {
+                    Text(
+                        text = "Loan slots in use: ${loans.size} of ${LoanPolicy.MAX_ACTIVE_LOANS}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 if (overdueCount > 0) {
-                    item {
+                    item(key = "overdue") {
                         Card(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -134,7 +142,10 @@ private fun LoanCard(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onRenew) { Text("Renew +7 days") }
+                val renewalsLeft = LoanPolicy.MAX_RENEWALS - book.renewCount
+                OutlinedButton(onClick = onRenew, enabled = renewalsLeft > 0) {
+                    Text("Renew +${LoanPolicy.RENEW_DAYS} days ($renewalsLeft left)")
+                }
                 Button(onClick = onReturn) { Text("Return") }
             }
         }
